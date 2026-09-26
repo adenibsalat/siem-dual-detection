@@ -1,0 +1,67 @@
+# Operating system
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Credentials and sensitive files
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+credentials.json
+secrets.json
+secrets.yaml
+secrets.yml
+
+# AWS / cloud credentials
+.aws/
+aws_credentials
+aws_credentials.txt
+
+# Local logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+
+# OS / tooling output
+.DS_Store
+
+# Generated SIEM exports
+splunk/sample-data/raw/generated/
+sentinel/sample-data/raw/generated/
+
+# Local experiment output
+results/
+output/
+tmp/
