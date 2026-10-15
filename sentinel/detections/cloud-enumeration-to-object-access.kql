@@ -37,28 +37,20 @@ let ObjectReads =
         and resource_type == "object"
         and result == "success"
     | project user, source_ip, read_time=timestamp, object_resource=resource;
-Listings
-| join kind=inner RoleEnumeration on user, source_ip
-| where role_time > listing_time
-    and role_time <= listing_time + Lookback
-| join kind=inner ObjectReads on user, source_ip
-| where read_time > role_time
-    and read_time <= role_time + Lookback
-| summarize arg_max(
-    role_time,
-    listing_time,
-    listed_resource,
-    role_resource
-  ) by user, source_ip, read_time, object_resource
-| project
-    user,
-    source_ip,
-    listing_time,
-    role_time,
-    read_time,
-    listed_resource,
-    role_resource,
-    object_resource
-| extend
-    detection_name = "Cloud Enumeration Followed by Object Access",
+let Sequences =
+    Listings
+    | join kind=inner RoleEnumeration on user, source_ip
+    | where role_time > listing_time
+        and role_time <= listing_time + Lookback
+    | join kind=inner ObjectReads on user, source_ip
+    | where read_time > role_time
+        and read_time <= role_time + Lookback
+        and read_time <= listing_time + Lookback
+    | project user, source_ip, listing_time, role_time, read_time,
+        listed_resource, role_resource, object_resource;
+Sequences
+| summarize arg_max(role_time, *) by user, source_ip, read_time, object_resource
+| project user, source_ip, listing_time, role_time, read_time,
+    listed_resource, role_resource, object_resource
+| extend detection_name = "Cloud Enumeration Followed by Object Access",
     severity = "High"

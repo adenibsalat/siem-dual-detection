@@ -15,7 +15,7 @@ The detection correlates events by username and source IP address. Events must o
 
 The project demonstrates detection engineering, event correlation, test-driven development, MITRE ATT&CK mapping, and cross-platform SIEM query design.
 
-**Validation status:** The local Python reference detector, data validator, and documented edge-case tests pass. The Splunk SPL and Microsoft Sentinel KQL still require execution and validation in their respective platforms.
+**Validation status:** The local Python reference detector, data validator, and documented edge-case tests pass. The Splunk SPL has been executed in Splunk and returned the expected positive detection. The KQL query has been executed in Azure Data Explorer with positive and negative tests; live Microsoft Sentinel validation remains outstanding.
 
 ## 2. Security and Data Safety
 
@@ -102,6 +102,15 @@ The local reference detector produces one expected alert for Charlie's sequence.
 
 **Validation boundary:** These results establish the behaviour of the local Python reference detector and the integrity of the synthetic data. They do not establish that either SIEM query executes successfully or produces equivalent results in a live platform.
 
+### KQL Execution in Azure Data Explorer
+
+The cloud-enumeration-to-object-access KQL query was executed in Azure Data Explorer using an inline synthetic dataset.
+
+- **Positive test:** The query returned one alert for Charlie's `ListObjects` → `ListRoles` → `GetObject` sequence within the 15-minute correlation window.
+- **Negative test:** Alice's listing and role-enumeration activity returned no rows because no successful object-read event completed the sequence.
+- **Evidence:** `assets/screenshots/04-kql-positive-detection.png` and `assets/screenshots/05-kql-negative-test.png`.
+- **Scope limitation:** This validates query execution and expected results in Azure Data Explorer. The query has not been deployed or tested as a live Microsoft Sentinel analytics rule.
+
 ## 7. MITRE ATT&CK Mapping
 
 The proposed mappings for the individual operations are:
@@ -129,8 +138,8 @@ These mappings must be interpreted in the context of the simulated event semanti
 ## 9. Next Steps
 
 1. Verify the ATT&CK mappings against the official technique descriptions.
-2. Validate the SPL syntax, time-window behaviour, and correlation results in Splunk.
-3. Execute the KQL harness in Microsoft Sentinel and verify its output.
+2. Expand Splunk validation with additional platform-specific positive, negative, and edge-case tests.
+3. Deploy and validate the KQL detection as a live Microsoft Sentinel analytics rule when a suitable workspace is available; the current Azure Data Explorer tests use an inline synthetic dataset.
 4. Test both implementations against equivalent positive, negative, and edge-case datasets.
 5. Compare actual platform results with `data/expected-results.csv`.
 6. Capture reproducible test evidence and document any platform-specific differences.
@@ -145,4 +154,4 @@ These mappings must be interpreted in the context of the simulated event semanti
 - Actual SIEM results match the expected outcomes.
 - Test evidence, limitations, and ATT&CK mappings are documented accurately.
 
-**Current status:** Local data validation and Python correlation tests pass. Live Splunk and Sentinel validation remains outstanding.
+**Current status:** Local data validation and Python correlation tests pass. The SPL has been executed in Splunk with the expected positive result. The KQL query has been executed in Azure Data Explorer with positive and negative tests. Live Microsoft Sentinel deployment and validation remain outstanding.
