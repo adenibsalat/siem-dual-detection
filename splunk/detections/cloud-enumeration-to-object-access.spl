@@ -1,48 +1,23 @@
-# Assumption: events are ingested with sourcetype=cloud_activity.
-# Required fields are extracted from the JSON event payload.
-index=* sourcetype="cloud_activity"
-| eval event_time=strptime(timestamp, "%Y-%m-%dT%H:%M:%SZ")
+
+index=* host="siem-dual-detection-lab" sourcetype="_json"
+| eval event_time=strptime(timestamp,"%Y-%m-%dT%H:%M:%SZ")
 | where isnotnull(event_time)
 | eval _time=event_time
-| eval action=lower(action),
-       user=lower(user),
-       source_ip=lower(source_ip),
-       result=lower(result),
-       resource_type=lower(resource_type)
-| where result="success"
-| eval is_listing=if(action="listobjects", 1, 0)
-| eval is_role_enum=if(action="listroles", 1, 0)
-| eval is_object_read=if(
-    action="getobject" AND resource_type="object",
-    1, 0
-  )
-| sort 0 +_time
-| streamstats time_window=16m current=f
-    latest(eval(if(is_listing=1, _time, null()))) as prior_listing_time
-    by user source_ip
-| eval valid_role=if(
-    is_role_enum=1
-    AND isnotnull(prior_listing_time)
-    AND _time > prior_listing_time
-    AND _time-prior_listing_time <= 900,
-    1, 0
-  )
-| eval valid_role_time=if(valid_role=1, _time, null())
-| eval listing_for_valid_role=if(
-    valid_role=1, prior_listing_time, null()
-  )
-| streamstats time_window=16m current=f
-    latest(valid_role_time) as prior_valid_role_time
-    latest(listing_for_valid_role) as listing_for_role_time
-    by user source_ip
-| where is_object_read=1
-    AND isnotnull(prior_valid_role_time)
-    AND isnotnull(listing_for_role_time)
-    AND _time > prior_valid_role_time
-    AND _time-prior_valid_role_time <= 900
-| eval detection_name="Cloud Enumeration Followed by Object Access"
-| eval severity="high"
-| eval listing_time=strftime(listing_for_role_time, "%Y-%m-%dT%H:%M:%SZ")
-| eval role_time=strftime(prior_valid_role_time, "%Y-%m-%dT%H:%M:%SZ")
-| eval read_time=strftime(_time, "%Y-%m-%dT%H:%M:%SZ")
-| table detection_name severity user source_ip listing_time role_time read_time resource cloud_service
+| eval action=lower(action), user=lower(user), source_ip=lower(source_ip), result=lower(result), resource_type=lower(resource_type)
+| sort 0 _time
+| streamstats time_window=15m
+    last(eval(if(action="listobjects" AND result="success",event_time,null()))) AS listing_time
+    last(eval(if(action="listobjects" AND result="success",user,null()))) AS listing_user
+    last(eval(if(action="listobjects" AND result="success",source_ip,null()))) AS listing_ip
+| streamstats time_window=15m
+    last(eval(if(action="listroles" AND result="success",event_time,null()))) AS role_time
+    last(eval(if(action="listroles" AND result="success",user,null()))) AS role_user
+    last(eval(if(action="listroles" AND result="success",source_ip,null()))) AS role_ip
+| where action="getobject" AND result="success" AND resource_type="object"
+    AND isnotnull(listing_time) AND isnotnull(role_time)
+    AND listing_time<=role_time AND role_time<=event_time
+    AND event_time-listing_time<=900
+    AND event_time-role_time<=900
+    AND user=listing_user AND user=role_user
+    AND source_ip=listing_ip AND source_ip=role_ip
+| table timestamp user source_ip action resource
