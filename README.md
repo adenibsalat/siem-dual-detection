@@ -100,6 +100,15 @@ The current local checks pass for:
 
 The local reference detector produces one expected alert for Charlie's sequence.
 
+### Splunk Validation in Search & Reporting
+
+The SPL detection was executed in Splunk Search & Reporting against the synthetic lab dataset and returned the expected `GetObject` event for Charlie.
+
+- **Positive test:** Charlie's `ListObjects` → `ListRoles` → `GetObject` sequence produced the expected result.
+- **Identity-isolation test:** A synthetic `ListRoles` event for Alice, using a different source IP, was inserted between Charlie's listing and object-access events. Charlie's detection still appeared, confirming that the tested SPL correlation is scoped by username and source IP.
+- **Evidence:** `assets/screenshots/02-splunk-positive-detection.png` and `assets/screenshots/07-splunk-identity-isolation-test.png`.
+- **Scope limitation:** These tests cover the documented scenarios; they do not establish detection effectiveness against all production telemetry.
+
 **Validation boundary:** These results establish the behaviour of the local Python reference detector and the integrity of the synthetic data. They do not establish that either SIEM query executes successfully or produces equivalent results in a live platform.
 
 ### KQL Execution in Azure Data Explorer
