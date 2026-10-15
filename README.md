@@ -15,7 +15,7 @@ The detection correlates events by username and source IP address. Events must o
 
 The project demonstrates detection engineering, event correlation, test-driven development, MITRE ATT&CK mapping, and cross-platform SIEM query design.
 
-**Validation status:** The local Python reference detector, data validator, and documented edge-case tests pass. The Splunk SPL has been executed in Splunk and returned the expected positive detection. The KQL query has been executed in Azure Data Explorer with positive and negative tests; live Microsoft Sentinel validation remains outstanding.
+**Validation status:** Local data validation and Python correlation regression tests pass. The SPL detection has been executed in Splunk Search & Reporting, including a positive detection, an identity-isolation test, and a later-listing regression test. The KQL query has been executed in Azure Data Explorer with positive and negative tests, plus a later-listing regression test. Live Microsoft Sentinel analytics-rule deployment and validation remain outstanding.
 
 ## 2. Security and Data Safety
 
@@ -88,37 +88,43 @@ python tests\test_cloud_correlation.py
 
 The current local checks pass for:
 
-- Data structure, timestamps, and expected-result references.
+- Data structure, timestamps, expected-result references, and MITRE technique ID formatting.
 - The expected positive sequence and incomplete negative sequence.
 - Missing role enumeration or object listing.
-- Incorrect event order.
-- Failed object reads.
-- Mismatched users or source IPs.
-- Intervals exceeding 15 minutes.
+- Incorrect event order and failed object reads.
+- Mismatched users or source IP addresses.
+- Listing-to-role and role-to-read intervals exceeding 15 minutes.
 - Incorrect resource types.
 - Exact 15-minute stage boundaries.
+- Selection of the latest qualifying listing and valid role enumeration.
+- Multiple qualifying object reads producing separate alerts.
+- A later listing not hiding an earlier valid listing-role sequence.
 
-The local reference detector produces one expected alert for Charlie's sequence.
+The local Python reference detector produces one expected alert for Charlie's sequence.
 
 ### Splunk Validation in Search & Reporting
 
-The SPL detection was executed in Splunk Search & Reporting against the synthetic lab dataset and returned the expected `GetObject` event for Charlie.
+The SPL detection was executed in Splunk Search & Reporting against the synthetic lab dataset.
 
-- **Positive test:** Charlie's `ListObjects` → `ListRoles` → `GetObject` sequence produced the expected result.
-- **Identity-isolation test:** A synthetic `ListRoles` event for Alice, using a different source IP, was inserted between Charlie's listing and object-access events. Charlie's detection still appeared, confirming that the tested SPL correlation is scoped by username and source IP.
-- **Evidence:** `assets/screenshots/02-splunk-positive-detection.png` and `assets/screenshots/07-splunk-identity-isolation-test.png`.
-- **Scope limitation:** These tests cover the documented scenarios; they do not establish detection effectiveness against all production telemetry.
-
-**Validation boundary:** These results establish the behaviour of the local Python reference detector and the integrity of the synthetic data. They do not establish that either SIEM query executes successfully or produces equivalent results in a live platform.
+- **Positive test:** Charlie's successful `ListObjects` → `ListRoles` → `GetObject` sequence produced the expected result.
+- **Identity-isolation test:** A synthetic role-enumeration event for a different user and source IP was inserted between Charlie's listing and object-access events. Charlie's detection still appeared.
+- **Later-listing regression test:** An additional successful `ListObjects` event was introduced after Charlie's role enumeration but before the object read. The detection continued to return Charlie's expected object-read event, retaining the earlier qualifying listing and role timestamps.
+- **Evidence:** `assets/screenshots/02-splunk-positive-detection.png`, `assets/screenshots/07-splunk-identity-isolation-test.png`, and `assets/screenshots/08-splunk-later-listing-regression-test.png`.
+- **Scope limitation:** These tests cover the documented synthetic scenarios; they do not establish detection effectiveness against all production telemetry.
 
 ### KQL Execution in Azure Data Explorer
 
-The cloud-enumeration-to-object-access KQL query was executed in Azure Data Explorer using an inline synthetic dataset.
+The KQL detection query was executed in Azure Data Explorer using an inline synthetic `datatable`.
 
-- **Positive test:** The query returned one alert for Charlie's `ListObjects` → `ListRoles` → `GetObject` sequence within the 15-minute correlation window.
-- **Negative test:** Alice's listing and role-enumeration activity returned no rows because no successful object-read event completed the sequence.
-- **Evidence:** `assets/screenshots/04-kql-positive-detection.png` and `assets/screenshots/05-kql-negative-test.png`.
-- **Scope limitation:** This validates query execution and expected results in Azure Data Explorer. The query has not been deployed or tested as a live Microsoft Sentinel analytics rule.
+- **Positive test:** The query returned the expected alert for Charlie's `ListObjects` → `ListRoles` → `GetObject` sequence.
+- **Negative test:** Alice's incomplete sequence returned no alert because it did not contain a subsequent successful object read.
+- **Later-listing regression test:** A temporary synthetic listing event was added after Charlie's role enumeration and before the object read. The query still returned the expected sequence with the earlier qualifying listing timestamp.
+- **Evidence:** `assets/screenshots/04-kql-positive-detection.png` and `assets/screenshots/05-kql-negative-test.png`. The later-listing regression was manually verified in ADX; a separate screenshot is not currently documented.
+- **Scope limitation:** This establishes execution in Azure Data Explorer using synthetic data. The query has not been deployed or tested as a live Microsoft Sentinel analytics rule.
+
+### Validation Boundary
+
+The local Python detector, Splunk SPL query, and KQL query have each been tested, but they have not yet been exhaustively compared across the full edge-case suite in both SIEM platforms. The ADX query uses an inline synthetic dataset rather than a live workspace table. Production readiness would require broader platform-specific testing, ingestion-field mapping, tuning, and investigation guidance.
 
 ## 7. MITRE ATT&CK Mapping
 
@@ -147,7 +153,7 @@ The mappings below describe behaviour represented by the synthetic cloud events.
 ## 9. Next Steps
 
 1. Verify the ATT&CK mappings against the official technique descriptions.
-2. Expand Splunk validation with additional platform-specific positive, negative, and edge-case tests.
+2. Expand platform-specific edge-case coverage and compare SPL and KQL results against the same expected scenarios.
 3. Deploy and validate the KQL detection as a live Microsoft Sentinel analytics rule when a suitable workspace is available; the current Azure Data Explorer tests use an inline synthetic dataset.
 4. Test both implementations against equivalent positive, negative, and edge-case datasets.
 5. Compare actual platform results with `data/expected-results.csv`.
@@ -159,8 +165,8 @@ The mappings below describe behaviour represented by the synthetic cloud events.
 - Synthetic data passes validation.
 - Positive and negative scenarios have explicit expected outcomes.
 - Local correlation logic passes the documented regression tests.
-- Both SIEM queries execute correctly against equivalent events.
-- Actual SIEM results match the expected outcomes.
+- Both queries execute against synthetic test data, with broader cross-platform edge-case parity still to be established.
+- Results from each tested platform match the expected outcomes for the scenarios executed.
 - Test evidence, limitations, and ATT&CK mappings are documented accurately.
 
 **Current status:** Local data validation and Python correlation tests pass. The SPL has been executed in Splunk with the expected positive result. The KQL query has been executed in Azure Data Explorer with positive and negative tests. Live Microsoft Sentinel deployment and validation remain outstanding.
