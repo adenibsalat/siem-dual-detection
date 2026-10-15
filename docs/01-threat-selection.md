@@ -2,325 +2,209 @@
 
 ## 1. Selected Threat
 
-### Primary Technique
+**Detection:** Cloud Resource Enumeration Followed by Object Access
 
-MITRE ATT&CK:
+The detection focuses on a sequence of successful cloud API operations that may warrant investigation.
 
-- T1078.004 - Valid Accounts: Cloud Accounts
-
-### Threat Description
-
-An attacker obtains valid credentials for a cloud identity and uses those credentials to authenticate successfully.
-
-Because the authentication uses legitimate credentials, the event may appear normal when examined in isolation.
-
-The detection challenge is therefore to identify contextual indicators of account compromise and correlate the authentication with subsequent cloud activity.
-
----
+It does not assume that resource enumeration or object access alone proves malicious activity.
 
 ## 2. Detection Hypothesis
 
-A legitimate cloud account may be compromised when successful authentication occurs from an unusual source or context and is followed by cloud activity that is inconsistent with the account's expected behavior.
+A successful object read may be more suspicious when the same user and source IP previously performed cloud object listing and identity-role enumeration in the required order.
 
-The detection should therefore combine multiple signals rather than triggering solely on one unusual login attribute.
+The initial sequence is:
 
----
+1. `ListObjects`
+2. `ListRoles`
+3. `GetObject`
+
+The events must be successful, share the same user and source IP, and occur within the configured time windows.
 
 ## 3. Attack Simulation
 
-The project will not use real compromised credentials.
+The project uses synthetic security telemetry rather than real compromised credentials or production logs.
 
-Instead, synthetic or controlled security telemetry will represent:
+The current dataset includes:
 
-1. Normal user authentication
-2. Legitimate unusual authentication
-3. Suspicious authentication
-4. Successful authentication
-5. Subsequent cloud activity
-6. Repeated activity associated with the same identity
+* Successful authentication events.
+* Cloud object listing.
+* Cloud identity-role enumeration.
+* Cloud object reads.
+* Normal and unusual source-context examples.
 
-The simulated events will preserve realistic fields and relationships required for detection engineering.
+The dataset represents test scenarios, not a verified real-world compromise.
 
----
+## 4. Relevant Telemetry
 
-## 4. Detection Signals
+### Identity and Source
 
-The detection will consider the following signals where telemetry supports them:
-
-### Identity
-
-- Username
-- Account type
-- User ID
-
-### Authentication
-
-- Authentication result
-- Authentication method
-- Timestamp
-- Source IP
-- User agent
-- Application
-
-### Source Context
-
-- Geographic location
-- ASN / network context where available
-- Known corporate network indicator
-- Known VPN / proxy indicator where available
+* Username
+* User ID
+* Source IP
+* Timestamp
 
 ### Cloud Activity
 
-- Cloud service
-- API/action
-- Resource
-- Source IP
-- Timestamp
-- User/account
+* Cloud service
+* API action
+* Resource
+* Resource type
+* Operation result
+* Timestamp
+* User and source IP
 
----
+Authentication fields such as application, MFA result, country and device identifier are available for contextual analysis, but are not currently part of the primary cloud-sequence correlation.
 
 ## 5. Correlation Model
 
-The detection should correlate:
+The primary detection correlates three event types:
 
-Authentication
-+
-Identity
-+
-Source context
-+
-Subsequent cloud activity
+`ListObjects → ListRoles → GetObject`
 
-within a defined time window.
+Requirements:
 
-The exact time window will be determined during validation.
+* Every operation succeeds.
+* All events share the same user and source IP.
+* The listing precedes role enumeration.
+* Role enumeration precedes the object read.
+* The listing-to-role and role-to-read intervals are each no greater than 15 minutes.
 
----
+The 15-minute interval is an initial hypothesis to test. It must be evaluated against legitimate operational behavior before production use.
 
-## 6. Detection Scenarios
+## 6. Test Scenarios
 
-### Scenario A — Normal Authentication
+### Scenario A — Enumeration Without Object Access
 
-A user authenticates from a known environment and performs expected activity.
+Alice lists objects and enumerates roles but does not subsequently read an object.
 
-Expected result:
+**Expected:** No alert from the primary three-stage correlation.
 
-No detection.
+### Scenario B — Complete Correlated Sequence
 
----
+Charlie lists objects, enumerates roles and then reads an object using the same user and source IP.
 
-### Scenario B — Legitimate Unusual Authentication
+**Expected:** One correlated alert for the tested sequence.
 
-A legitimate user authenticates from an unusual location or network but there is no evidence of malicious activity.
+### Scenario C — Missing Enumeration Stage
 
-Expected result:
+A user reads an object without the required preceding listing or role enumeration.
 
-The activity should not automatically be treated as confirmed compromise.
+**Expected:** No alert.
 
----
+### Scenario D — Incorrect Event Order
 
-### Scenario C — Suspicious Authentication + Cloud Activity
+The required events occur in an order other than listing, role enumeration, then object read.
 
-A user successfully authenticates from suspicious or unusual context and subsequently performs cloud activity.
+**Expected:** No alert.
 
-Expected result:
+### Scenario E — Failed Operation
 
-Detection generated.
+One of the required operations fails.
 
----
+**Expected:** The failed operation must not satisfy the successful-event correlation.
 
-### Scenario D — Failed Authentication
+### Scenario F — Identity or Source Mismatch
 
-A user generates failed authentication attempts without successful access.
+The stages occur under different users or source IPs.
 
-Expected result:
+**Expected:** No correlation across those mismatched events.
 
-Not treated as the primary compromised-account detection.
+### Scenario G — Outside the Time Window
 
----
+One required interval exceeds 15 minutes.
 
-### Scenario E — Suspicious Authentication Without Follow-Up Activity
+**Expected:** No alert for that sequence.
 
-A suspicious authentication occurs but no relevant subsequent cloud activity is observed.
+These scenarios define intended behavior. They should be implemented as automated tests and verified in both SIEMs before being described as passed.
 
-Expected result:
+## 7. Local Validation Results
 
-Lower-confidence signal or no primary detection, depending on the final detection design.
+The current Python correlation test loads eight synthetic cloud-activity events and confirms that exactly one expected sequence is detected.
 
----
+The detected sequence is Charlie's activity:
 
-### Scenario F — Repeated Activity
+`14:03 ListObjects → 14:07 ListRoles → 14:12 GetObject`
 
-The same identity performs multiple suspicious authentication/activity sequences.
+The data validator confirms that the JSON datasets and expected-results CSV pass the current integrity checks.
 
-Expected result:
+Additional automated tests pass for missing stages, incorrect order, failed object reads, mismatched users or source IPs, intervals exceeding 15 minutes, incorrect resource types, and exact 15-minute boundaries.
 
-The detection should avoid generating unnecessarily fragmented alerts where correlation can provide a more useful incident-level view.
+These results validate the local reference detector and dataset integrity. They do not establish that the SPL or KQL executes correctly in either SIEM.
 
----
 
-## 7. Positive Test Case
+## 8. MITRE ATT&CK Mapping
 
-The primary positive test case represents:
+The proposed mappings for the simulated operations are:
 
-1. Successful authentication
-2. Suspicious source/context
-3. Subsequent cloud activity
-4. Same identity across events
-5. Activity occurring within the detection correlation window
+* `ListObjects`: T1619 — Cloud Storage Object Discovery.
+* `ListRoles`: T1087.004 — Cloud Account.
+* `GetObject`: T1530 — Data from Cloud Storage.
 
-Expected detection:
+T1530 is the primary mapping for the positive scenario because the sequence culminates in cloud-object access. T1619 and T1087.004 describe the preceding discovery stages.
 
-TRUE POSITIVE
+These mappings must be assessed against the official ATT&CK definitions and the precise simulated behavior. The sequence does not independently establish malicious intent, account compromise, or data exfiltration.
 
----
 
-## 8. Negative Test Cases
+## 9. Splunk Implementation
 
-The detection must be tested against:
+File: `splunk/detections/cloud-enumeration-to-object-access.spl`
 
-### Negative Test 1
+The SPL draft must:
 
-Normal authentication + normal cloud activity.
+* Parse the event timestamp consistently.
+* Filter to successful cloud operations.
+* Normalize action, user and source-IP values.
+* Enforce the required event order.
+* Apply the correlation time windows.
+* Return useful investigation context.
 
-Expected:
+**Validation status:** Draft only. Execute it against the source dataset in Splunk and verify positive and negative cases before claiming platform validation.
 
-NO ALERT
+## 10. Microsoft Sentinel Implementation
 
-### Negative Test 2
+File: `sentinel/detections/cloud-enumeration-to-object-access.kql`
 
-Unusual authentication + no subsequent activity.
+The KQL demonstration currently uses an embedded `datatable` containing synthetic cloud events.
 
-Expected:
+The query must enforce the same event order, identity and source-IP matching, success conditions and time windows as the intended detection.
 
-NO PRIMARY ALERT
+**Validation status:** Demonstration query only. Validate its output in the KQL environment, then document how the logic maps to the actual Sentinel tables and fields.
 
-### Negative Test 3
+## 11. Cross-SIEM Equivalence
 
-Unusual authentication + legitimate subsequent activity.
+Equivalent detections must produce equivalent outcomes from the same source events.
 
-Expected:
+The comparison should cover:
 
-LOWER CONFIDENCE / NO PRIMARY ALERT
+* Event ordering and correlation windows.
+* Schema and field mapping.
+* Filtering and normalization.
+* Duplicate alert behavior.
+* Investigation context.
+* False-positive handling.
+* Query maintainability.
 
-### Negative Test 4
+Syntactic similarity is not enough. Behavioral equivalence must be demonstrated with test results.
 
-Normal authentication + suspicious-looking cloud activity generated by an approved security process.
+## 12. Known Limitations
 
-Expected:
+* The dataset is synthetic and small.
+* Unusual or correlated activity does not independently establish malicious intent.
+* The current primary correlation does not incorporate authentication context.
+* The 15-minute threshold is provisional.
+* The local Python reference detector has passing edge-case tests, but duplicate and repeated sequences, multiple object reads, and equivalent behavior across both SIEMs require further validation.
+* The SIEM query drafts have not yet been live-validated.
+* Production use would require environment-specific tuning, enrichment and monitoring.
 
-NO FALSE POSITIVE WHERE CONTEXT IS AVAILABLE
+## 13. Completion Standard
 
----
+The detection is ready to present as validated only when:
 
-## 9. Required Detection Fields
-
-The final alert should expose:
-
-- Username
-- User ID where available
-- Source IP
-- Source location
-- Authentication timestamp
-- Authentication result
-- Application
-- User agent
-- Cloud service
-- Cloud action
-- Resource
-- Subsequent activity timestamp
-- Detection reason
-- MITRE technique
-- Risk/context indicators
-
----
-
-## 10. Analyst Investigation Questions
-
-When the detection fires, an analyst should be able to answer:
-
-1. Which account was involved?
-2. Was authentication successful?
-3. Where did the authentication originate?
-4. Is the source known or expected?
-5. Was MFA involved?
-6. What application or service was accessed?
-7. What cloud activity occurred afterward?
-8. What resources were accessed?
-9. Has the account shown similar behavior previously?
-10. Are other accounts associated with the same source?
-11. Does the activity match an expected business process?
-12. Should the account or session be contained?
-
----
-
-## 11. Data Quality Requirements
-
-The simulated data must contain enough realistic structure to support the detection.
-
-The project must not fabricate a detection by creating a dataset containing only fields that make the query trivially successful.
-
-Where a field would normally come from enrichment or a specific cloud provider, the project will explicitly document that limitation.
-
----
-
-## 12. Splunk Implementation
-
-The Splunk implementation will translate the detection hypothesis into SPL.
-
-The implementation will document:
-
-- Required indexes/sourcetypes
-- Field extraction
-- Normalization
-- Correlation logic
-- Time window
-- Filtering
-- Enrichment
-- Alert output
-- False-positive controls
-
----
-
-## 13. Microsoft Sentinel Implementation
-
-The Sentinel implementation will translate the same detection hypothesis into KQL.
-
-The implementation will document:
-
-- Required tables
-- Field mapping
-- Normalization
-- Correlation logic
-- Time window
-- Filtering
-- Enrichment
-- Alert output
-- False-positive controls
-
----
-
-## 14. Cross-SIEM Equivalence
-
-The Splunk and Sentinel detections must implement the same underlying detection hypothesis.
-
-Differences in syntax, schema, enrichment, and platform capabilities will be documented rather than hidden.
-
-The goal is behavioral equivalence, not identical queries.
-
----
-
-## 15. Validation Standard
-
-A detection will not be considered complete simply because the query returns results.
-
-It must demonstrate:
-
-- True-positive detection
-- Negative-test resistance
-- Useful alert context
-- Defensible MITRE mapping
-- Explainable detection logic
-- Documented limitations
-- Reproducibility
+1. Automated tests cover positive and negative sequences.
+2. Data validation and correlation tests pass.
+3. SPL and KQL execute successfully in their respective platforms.
+4. Both implementations produce the expected results.
+5. Alert context and MITRE mappings are reviewed.
+6. Limitations and assumptions are documented.
+7. Genuine SIEM screenshots support the reported results.
+8. Another analyst can reproduce the experiment from the repository.

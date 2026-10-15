@@ -1,0 +1,98 @@
+[
+{
+"timestamp": "2026-10-12T09:05:00Z",
+"event_type": "cloud_activity",
+"user": "alice",
+"user_id": "usr-001",
+"source_ip": "192.0.2.10",
+"cloud_service": "ObjectStorage",
+"action": "GetObject",
+"resource": "reports/monthly-summary.csv",
+"resource_type": "object",
+"result": "success"
+},
+{
+"timestamp": "2026-10-12T10:06:00Z",
+"event_type": "cloud_activity",
+"user": "bob",
+"user_id": "usr-002",
+"source_ip": "198.51.100.20",
+"cloud_service": "ObjectStorage",
+"action": "GetObject",
+"resource": "reports/monthly-summary.csv",
+"resource_type": "object",
+"result": "success"
+},
+{
+"timestamp": "2026-10-12T11:04:00Z",
+"event_type": "cloud_activity",
+"user": "alice",
+"user_id": "usr-001",
+"source_ip": "203.0.113.50",
+"cloud_service": "ObjectStorage",
+"action": "ListObjects",
+"resource": "finance-archive",
+"resource_type": "bucket",
+"result": "success"
+},
+{
+"timestamp": "2026-10-12T11:08:00Z",
+"event_type": "cloud_activity",
+"user": "alice",
+"user_id": "usr-001",
+"source_ip": "203.0.113.50",
+"cloud_service": "IdentityService",
+"action": "ListRoles",
+"resource": "account-roles",
+"resource_type": "identity_inventory",
+"result": "success"
+},
+{
+"timestamp": "2026-10-12T13:05:00Z",
+"event_type": "cloud_activity",
+"user": "bob",
+"user_id": "usr-002",
+"source_ip": "192.0.2.25",
+"cloud_service": "ObjectStorage",
+"action": "GetObject",
+"resource": "reports/monthly-summary.csv",
+"resource_type": "object",
+"result": "success"
+},
+{
+"timestamp": "2026-10-12T14:03:00Z",
+"event_type": "cloud_activity",
+"user": "charlie",
+"user_id": "usr-003",
+"source_ip": "203.0.113.70",
+"cloud_service": "ObjectStorage",
+"action": "ListObjects",
+"resource": "finance-archive",
+"resource_type": "bucket",
+"result": "success"
+},
+{
+"timestamp": "2026-10-12T14:07:00Z",
+"event_type": "cloud_activity",
+"user": "charlie",
+"user_id": "usr-003",
+"source_ip": "203.0.113.70",
+"cloud_service": "IdentityService",
+"action": "ListRoles",
+"resource": "account-roles",
+"resource_type": "identity_inventory",
+"result": "success"
+},
+{
+"timestamp": "2026-10-12T14:12:00Z",
+"event_type": "cloud_activity",
+"user": "charlie",
+"user_id": "usr-003",
+"source_ip": "203.0.113.70",
+"cloud_service": "ObjectStorage",
+"action": "GetObject",
+"resource": "finance-archive/q3-report.csv",
+"resource_type": "object",
+"result": "success"
+}
+]

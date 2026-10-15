@@ -1,0 +1,64 @@
+
+let Lookback = 15m;
+let CloudEvents = datatable(
+    timestamp:datetime,
+    user:string,
+    source_ip:string,
+    cloud_service:string,
+    action:string,
+    resource:string,
+    resource_type:string,
+    result:string
+)
+[
+    datetime(2026-10-12T11:04:00Z), "alice", "203.0.113.50", "ObjectStorage", "ListObjects", "finance-archive", "bucket", "success",
+    datetime(2026-10-12T11:08:00Z), "alice", "203.0.113.50", "IdentityService", "ListRoles", "account-roles", "identity_inventory", "success",
+    datetime(2026-10-12T14:03:00Z), "charlie", "203.0.113.70", "ObjectStorage", "ListObjects", "finance-archive", "bucket", "success",
+    datetime(2026-10-12T14:07:00Z), "charlie", "203.0.113.70", "IdentityService", "ListRoles", "account-roles", "identity_inventory", "success",
+    datetime(2026-10-12T14:12:00Z), "charlie", "203.0.113.70", "ObjectStorage", "GetObject", "finance-archive/q3-report.csv", "object", "success"
+]
+| extend
+    user = tolower(user),
+    source_ip = tolower(source_ip),
+    action = tolower(action),
+    resource_type = tolower(resource_type),
+    result = tolower(result);
+let Listings =
+    CloudEvents
+    | where action == "listobjects" and result == "success"
+    | project user, source_ip, listing_time=timestamp, listed_resource=resource;
+let RoleEnumeration =
+    CloudEvents
+    | where action == "listroles" and result == "success"
+    | project user, source_ip, role_time=timestamp, role_resource=resource;
+let ObjectReads =
+    CloudEvents
+    | where action == "getobject"
+        and resource_type == "object"
+        and result == "success"
+    | project user, source_ip, read_time=timestamp, object_resource=resource;
+Listings
+| join kind=inner RoleEnumeration on user, source_ip
+| where role_time > listing_time
+    and role_time <= listing_time + Lookback
+| join kind=inner ObjectReads on user, source_ip
+| where read_time > role_time
+    and read_time <= role_time + Lookback
+| summarize arg_max(
+    role_time,
+    listing_time,
+    listed_resource,
+    role_resource
+  ) by user, source_ip, read_time, object_resource
+| project
+    user,
+    source_ip,
+    listing_time,
+    role_time,
+    read_time,
+    listed_resource,
+    role_resource,
+    object_resource
+| extend
+    detection_name = "Cloud Enumeration Followed by Object Access",
+    severity = "High"

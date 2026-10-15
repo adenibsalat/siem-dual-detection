@@ -2,220 +2,135 @@
 
 ## 1. Project Objective
 
-Build and validate equivalent security detections in Splunk and Microsoft Sentinel for the same realistic cloud identity attack scenario.
+Build and compare equivalent security detections in Splunk and Microsoft Sentinel using the same synthetic cloud-activity dataset.
 
-The project will compare not only SPL and KQL syntax, but also the telemetry requirements, detection logic, investigation context, false-positive handling, MITRE ATT&CK mapping, and analyst workflow required to operationalize the detection.
-
-The goal is to demonstrate practical detection-engineering skills rather than simply demonstrate knowledge of two SIEM query languages.
+The project focuses on detection engineering, event correlation, query implementation, false-positive resistance, MITRE ATT&CK mapping, investigation context and reproducible testing.
 
 ## 2. Detection Engineering Question
 
-How can a SOC detect suspicious use of a legitimate cloud identity when the authentication itself may appear valid?
+How can a SOC identify potentially suspicious cloud activity when an identity uses successful, apparently legitimate API operations?
 
-The detection should use multiple contextual signals rather than relying on a single indicator such as an unusual IP address or geographic location.
+The detection investigates a sequence of cloud resource enumeration, identity-role enumeration and subsequent object access. No individual action is automatically treated as proof of compromise.
 
 ## 3. SIEMs Compared
 
-### Splunk
+* **Splunk:** SPL-based detection and investigation.
+* **Microsoft Sentinel:** KQL-based detection and investigation.
 
-Splunk Enterprise / Splunk-style SPL detection workflow.
-
-### Microsoft Sentinel
-
-Microsoft Sentinel using Kusto Query Language (KQL) and Microsoft security telemetry concepts.
+The project will document differences in query logic, schema requirements, alert output and operational workflows.
 
 ## 4. Threat Scenario
 
-An attacker obtains valid cloud credentials and uses them to authenticate to a cloud environment.
+A legitimate cloud identity performs a sequence of successful actions:
 
-The attacker attempts to operate using the legitimate identity while performing activity that differs from the account's expected behavior.
+1. Lists objects in a cloud-storage resource.
+2. Enumerates cloud identity roles.
+3. Reads an object from cloud storage.
 
-The detection engineering challenge is to identify the suspicious identity usage while minimizing alerts caused by legitimate users travelling, using VPNs, changing networks, or accessing resources from unusual locations.
+The sequence may warrant investigation because it combines resource discovery with subsequent data access. Its significance depends on the environment, permissions, user baseline and business context.
 
-## 5. Attacker Objective
+All events in the current dataset are synthetic.
 
-Obtain access to cloud resources using compromised legitimate credentials while avoiding detection based on the fact that the credentials themselves are valid.
+## 5. Detection Hypothesis
 
-## 6. Initial Access
+A successful object read is more suspicious when the same user and source IP previously performed both object listing and role enumeration in the required order within the configured time windows.
 
-Compromised cloud credentials.
+The initial correlation model requires:
 
-The project will simulate the resulting identity activity rather than obtaining or using real credentials.
+* Successful events.
+* The same user and source IP across the sequence.
+* `ListObjects` before `ListRoles`.
+* `ListRoles` before `GetObject`.
+* No more than 15 minutes between consecutive stages.
 
-## 7. Attack Chain
+The 15-minute threshold is an initial test parameter, not a universally optimal production setting.
 
-1. Valid cloud account authentication
-2. Authentication from an unusual source/context
-3. Successful authentication
-4. Subsequent cloud activity using the same identity
-5. Detection correlation between authentication and subsequent activity
-6. Analyst investigation and response
+## 6. Data Sources
 
-## 8. Detection Objective
+The repository contains synthetic authentication and cloud-activity events.
 
-Detect potentially compromised cloud accounts by identifying suspicious authentication context combined with subsequent successful activity.
+Cloud-activity fields include timestamps, user identity, source IP, service, action, resource, resource type and result.
 
-The detection should provide sufficient context for an analyst to determine whether the activity represents legitimate unusual behavior or potential account compromise.
+Authentication telemetry provides additional identity and source context. The current cloud-correlation test does not yet correlate authentication events into the primary detection.
 
-## 9. MITRE ATT&CK Techniques
+## 7. Detection Output
 
-Primary technique:
+The intended alert context includes:
 
-- T1078.004 - Valid Accounts: Cloud Accounts
+* Detection name and severity.
+* User and source IP.
+* Listing, role-enumeration and object-read timestamps.
+* Affected resource.
+* Relevant cloud service.
+* Detection rationale and investigation guidance.
 
-Additional techniques will only be mapped where the simulated behavior and available telemetry provide sufficient evidence to justify the mapping.
+Severity is provisional and must be tuned against environment-specific context.
 
-The project will avoid mapping techniques solely because they appear conceptually related.
+## 8. MITRE ATT&CK Mapping
 
-## 10. Data Sources
+The proposed mappings for the simulated operations are:
 
-### Splunk
+* `ListObjects`: T1619 — Cloud Storage Object Discovery.
+* `ListRoles`: T1087.004 — Cloud Account.
+* `GetObject`: T1530 — Data from Cloud Storage.
 
-Authentication and cloud activity events containing, where available:
+T1530 is the primary mapping for the positive scenario because the sequence culminates in cloud-object access. The other techniques describe the preceding discovery stages.
 
-- Timestamp
-- Username / account
-- Source IP
-- Destination / application
-- Authentication result
-- User agent
-- Geographic information
-- Cloud resource or service
-- Action performed
-- Event type
-- Session or correlation identifier
+These mappings must be interpreted according to the simulated event semantics and verified against the official ATT&CK definitions. They provide investigative context and do not independently establish malicious intent.
 
-### Microsoft Sentinel
 
-Equivalent authentication and cloud activity telemetry containing the fields required to reproduce the detection logic.
+## 9. Validation Strategy
 
-The project will document any differences between the telemetry models rather than pretending that the two platforms expose identical schemas.
+The local data validator passes for the current 14 synthetic events and two expected scenarios.
 
-## 11. Detection Requirements
+The Python reference detector produces exactly one expected alert for Charlie's `ListObjects → ListRoles → GetObject` sequence. Alice's incomplete sequence does not trigger an alert.
 
-### Detection Logic
+The regression tests also pass for missing stages, incorrect order, failed object reads, mismatched users or source IPs, intervals exceeding 15 minutes, incorrect resource types, and exact 15-minute boundaries.
 
-The detection must identify suspicious use of a legitimate cloud identity using multiple contextual signals.
+These checks validate the local reference detector and data integrity. They do not establish that the Splunk SPL or Microsoft Sentinel KQL executes correctly in either platform.
 
-A single unusual login characteristic must not automatically result in a high-confidence compromise alert.
+Further validation must cover duplicate or repeated sequences, multiple object reads, and equivalent results from both SIEM implementations.
 
-### Required Fields
 
-The detection should expose enough information to investigate:
+## 10. Cross-SIEM Equivalence
 
-- User/account
-- Source IP
-- Authentication timestamp
-- Authentication result
-- Source location where available
-- Application/resource
-- User agent where available
-- Subsequent activity
-- Detection reason
-- Risk/context indicators
+Both SIEM implementations must express the same detection hypothesis and be evaluated against equivalent source events and expected outcomes.
 
-### Correlation Requirements
+The Sentinel query currently uses an inline synthetic `datatable` as a test harness rather than querying a live workspace table. The Splunk SPL is a draft that assumes the relevant events have been ingested under `sourcetype="cloud_activity"` with the expected field names.
 
-Where telemetry allows, authentication activity should be correlated with subsequent activity performed by the same identity.
+Neither implementation has been confirmed through live execution. Validation must check query syntax, event ordering, time boundaries, duplicate handling, alert fields, and agreement with the expected positive and negative scenarios.
 
-### Time-Based Requirements
+Results must be documented honestly, distinguishing local tests from genuine platform execution evidence.
 
-The detection should define an explicit correlation window rather than relying on unlimited historical searches.
 
-## 12. Expected Detection Output
+## 11. False-Positive Considerations
 
-A detection should produce an analyst-readable result containing:
+Legitimate administrators, cloud inventory tools, backup processes and approved security tooling may perform similar operations.
 
-- Account
-- Source IP
-- Authentication time
-- Suspicious context
-- Subsequent activity
-- Detection rationale
-- MITRE ATT&CK technique
-- Recommended investigation steps
+Production deployment would require environment-specific baselines, appropriate exclusions, identity and network enrichment, and review of the resources accessed.
 
-## 13. Validation Strategy
+The detection identifies activity for investigation; it does not independently prove malicious intent.
 
-The detection will be tested against:
+## 12. Reproducibility and Safety
 
-1. Benign normal authentication
-2. Legitimate unusual authentication
-3. Suspicious authentication followed by cloud activity
-4. Multiple authentication attempts
-5. Authentication without subsequent suspicious activity
-6. Multiple users and source IPs
-7. Repeated activity from the same source
+* All current identities, events and IP addresses are synthetic.
+* Timestamps use UTC.
+* The source dataset and expected outcomes are stored in the repository.
+* Local validation and correlation tests are reproducible with Python.
+* SIEM-specific assumptions and field mappings must be documented.
+* No real credentials or production security logs are required.
 
-Detection results will be compared against the expected outcome for each test case.
+## 13. Project Success Criteria
 
-## 14. False Positive Considerations
+The project is complete when:
 
-Potential false positives include:
-
-- Corporate VPN usage
-- Remote workers
-- Legitimate travel
-- Cloud-hosted corporate infrastructure
-- Security testing
-- Service accounts
-- New devices
-- Shared accounts
-
-The project will document how detection logic can reduce unnecessary alerts without simply suppressing unusual activity.
-
-## 15. Investigation Workflow
-
-The investigation should allow an analyst to move from:
-
-Authentication event
-→ identity context
-→ source context
-→ subsequent activity
-→ affected resources
-→ timeline
-→ determination of suspicious/legitimate activity.
-
-## 16. Response / Containment
-
-Potential response actions will be documented at a conceptual level, including:
-
-- Validate the activity with the user
-- Review recent authentication history
-- Review subsequent cloud activity
-- Revoke active sessions where appropriate
-- Reset or rotate credentials where compromise is confirmed
-- Review MFA configuration
-- Investigate related identities and source infrastructure
-
-## 17. Splunk vs Sentinel Comparison Criteria
-
-The project will compare:
-
-- Query language
-- Data normalization
-- Detection logic
-- Correlation capabilities
-- Enrichment
-- Investigation workflow
-- Alert context
-- False-positive handling
-- MITRE ATT&CK integration
-- Detection maintainability
-- Analyst usability
-
-The comparison will focus on observed engineering trade-offs rather than declaring one SIEM universally superior.
-
-## 18. Project Success Criteria
-
-The project is successful when:
-
-1. The same threat scenario can be represented in both SIEMs.
-2. Equivalent detection objectives can be implemented in SPL and KQL.
-3. Each detection is mapped to MITRE ATT&CK using defensible evidence.
-4. The detections are validated against both positive and negative test cases.
-5. False-positive considerations are documented.
-6. Detection output contains actionable analyst context.
-7. The project documents meaningful differences between the two SIEM implementations.
-8. Another detection engineer can reproduce the experiment from the repository.
-9. Post 2 can demonstrate the complete detection lifecycle from attack behavior to alert to investigation.
+1. The dataset passes schema and integrity checks.
+2. Positive and negative sequence tests pass.
+3. SPL and KQL enforce equivalent ordering and time-window requirements.
+4. Both queries execute successfully in their respective SIEMs.
+5. Actual SIEM results match documented expected outcomes.
+6. Alert context and MITRE mappings are defensible.
+7. Known limitations and false-positive considerations are documented.
+8. Screenshots show genuine platform execution results.
+9. Another analyst can reproduce the experiment from the repository.
+10. The final comparison discusses observed engineering trade-offs rather than declaring one SIEM universally superior.

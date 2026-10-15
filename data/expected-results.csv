@@ -1,0 +1,3 @@
+scenario_id,detection_name,event_time,user,source_ip,expected_severity,expected_outcome,mitre_technique,mitre_techniques
+CLOUD-NEG-001,Incomplete Cloud Enumeration Sequence,2026-10-12T11:08:00Z,alice,203.0.113.50,Low,No Alert,,""
+CLOUD-POS-001,Cloud Enumeration Followed by Object Access,2026-10-12T14:12:00Z,charlie,203.0.113.70,High,Alert,T1530,"T1619;T1087.004;T1530"
