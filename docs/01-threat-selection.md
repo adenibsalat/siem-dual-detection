@@ -134,15 +134,17 @@ These results validate the local reference detector and dataset integrity. They 
 
 ## 8. MITRE ATT&CK Mapping
 
-The proposed mappings for the simulated operations are:
+The mappings below describe the behaviour represented by the synthetic cloud events. They do not independently establish malicious intent, account compromise, or data exfiltration.
 
-* `ListObjects`: T1619 — Cloud Storage Object Discovery.
-* `ListRoles`: T1087.004 — Cloud Account.
-* `GetObject`: T1530 — Data from Cloud Storage.
+| Simulated operation | ATT&CK technique | Relevant tactic | Mapping rationale |
+|---|---|---|---|
+| `ListObjects` | [T1619 — Cloud Storage Object Discovery](https://attack.mitre.org/techniques/T1619/) | Discovery | Represents enumeration of objects in cloud storage. |
+| `ListRoles` | [T1087.004 — Cloud Account](https://attack.mitre.org/techniques/T1087/004/) | Discovery | Represents enumeration of cloud account or identity information through role-related activity. Confirm the mapping against the exact API semantics of the target cloud platform before production use. |
+| `GetObject` | [T1530 — Data from Cloud Storage](https://attack.mitre.org/techniques/T1530/) | Collection | Represents access to data stored in a cloud object. A successful read alone does not establish exfiltration or malicious collection. |
 
-T1530 is the primary mapping for the positive scenario because the sequence culminates in cloud-object access. T1619 and T1087.004 describe the preceding discovery stages.
+**Primary mapping:** T1530 is associated with the final object-access stage of the positive scenario. T1619 and T1087.004 describe the preceding discovery stages.
 
-These mappings must be assessed against the official ATT&CK definitions and the precise simulated behavior. The sequence does not independently establish malicious intent, account compromise, or data exfiltration.
+**Detection limitation:** The correlation identifies a sequence of successful operations sharing a user and source IP within the configured time windows. It does not establish that the account is compromised or that the sequence is malicious. Validate the mappings against the actual cloud-provider API semantics and legitimate operational baselines before production use.
 
 
 ## 9. Splunk Implementation
@@ -158,7 +160,7 @@ The SPL draft must:
 * Apply the correlation time windows.
 * Return useful investigation context.
 
-**Validation status:** Draft only. Execute it against the source dataset in Splunk and verify positive and negative cases before claiming platform validation.
+**Validation status:** The SPL has been executed in Splunk and returned the expected positive detection for the synthetic Charlie sequence. Broader platform-specific negative and edge-case testing remains outstanding.
 
 ## 10. Microsoft Sentinel Implementation
 
@@ -168,7 +170,7 @@ The KQL demonstration currently uses an embedded `datatable` containing syntheti
 
 The query must enforce the same event order, identity and source-IP matching, success conditions and time windows as the intended detection.
 
-**Validation status:** Demonstration query only. Validate its output in the KQL environment, then document how the logic maps to the actual Sentinel tables and fields.
+**Validation status:** The KQL query has been executed in Azure Data Explorer against an inline synthetic dataset, with positive and negative tests. It has not been deployed or validated as a live Microsoft Sentinel analytics rule. Mapping to Sentinel tables and fields remains outstanding.
 
 ## 11. Cross-SIEM Equivalence
 
@@ -193,7 +195,7 @@ Syntactic similarity is not enough. Behavioral equivalence must be demonstrated 
 * The current primary correlation does not incorporate authentication context.
 * The 15-minute threshold is provisional.
 * The local Python reference detector has passing edge-case tests, but duplicate and repeated sequences, multiple object reads, and equivalent behavior across both SIEMs require further validation.
-* The SIEM query drafts have not yet been live-validated.
+* The Splunk SPL has been executed in Splunk, with the expected positive detection verified. The KQL query has been tested in Azure Data Explorer against synthetic data, but has not been deployed or validated as a live Microsoft Sentinel analytics rule. Broader platform-specific negative and edge-case testing remains incomplete.
 * Production use would require environment-specific tuning, enrichment and monitoring.
 
 ## 13. Completion Standard

@@ -1,0 +1,63 @@
+{
+  "name": "Cloud Enumeration Followed by Object Access",
+  "versions": {
+    "attack": "17",
+    "navigator": "4.9.1",
+    "layer": "4.5"
+  },
+  "domain": "enterprise-attack",
+  "description": "Synthetic detection mapping ListObjects, ListRoles and GetObject. The layer represents behavioural hypotheses, not proof of compromise or malicious intent.",
+  "filters": {
+    "platforms": [
+      "IaaS",
+      "SaaS"
+    ]
+  },
+  "sorting": 0,
+  "layout": {
+    "layout": "side",
+    "aggregateFunction": "average",
+    "showID": true,
+    "showName": true,
+    "showAggregateScores": false,
+    "countUnscored": false
+  },
+  "hideDisabled": false,
+  "techniques": [
+    {
+      "techniqueID": "T1619",
+      "tactic": "discovery",
+      "score": 1,
+      "comment": "ListObjects: simulated cloud-storage object enumeration. Discovery mapping; does not establish malicious intent."
+    },
+    {
+      "techniqueID": "T1087.004",
+      "tactic": "discovery",
+      "score": 1,
+      "comment": "ListRoles: simulated cloud identity or role enumeration. Confirm the exact API semantics for the target provider."
+    },
+    {
+      "techniqueID": "T1530",
+      "tactic": "collection",
+      "score": 1,
+      "comment": "GetObject: simulated access to cloud-stored data. A successful read alone does not prove malicious collection or exfiltration."
+    }
+  ],
+  "gradient": {
+    "colors": [
+      "#fff2cc",
+      "#ffcc66",
+      "#cc3333"
+    ],
+    "minValue": 0,
+    "maxValue": 100
+  },
+  "legendItems": [],
+  "metadata": [],
+  "links": [],
+  "showTacticRowBackground": false,
+  "tacticRowBackground": "#dddddd",
+  "selectTechniquesAcrossTactics": true,
+  "selectSubtechniquesWithParent": false,
+  "selectVisibleTechniques": false
+}

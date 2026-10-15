@@ -113,17 +113,17 @@ The cloud-enumeration-to-object-access KQL query was executed in Azure Data Expl
 
 ## 7. MITRE ATT&CK Mapping
 
-The proposed mappings for the individual operations are:
+The mappings below describe behaviour represented by the synthetic cloud events. They provide investigative context and do not independently establish malicious intent, account compromise, or data exfiltration.
 
-| Operation | Proposed technique | Rationale |
-|---|---|---|
-| `ListObjects` | [T1619 — Cloud Storage Object Discovery](https://attack.mitre.org/techniques/T1619/) | Discovery of objects in cloud storage |
-| `ListRoles` | [T1087.004 — Cloud Account](https://attack.mitre.org/techniques/T1087/004/) | Enumeration of cloud accounts or identity information |
-| `GetObject` | [T1530 — Data from Cloud Storage](https://attack.mitre.org/techniques/T1530/) | Access to data stored in cloud objects |
+| Operation | ATT&CK technique | Relevant tactic | Mapping rationale |
+|---|---|---|---|
+| `ListObjects` | [T1619 — Cloud Storage Object Discovery](https://attack.mitre.org/techniques/T1619/) | Discovery | Represents enumeration of objects in cloud storage. |
+| `ListRoles` | [T1087.004 — Cloud Account](https://attack.mitre.org/techniques/T1087/004/) | Discovery | Represents enumeration of cloud account or identity information through role-related activity. Validate against the exact API semantics of the target cloud provider. |
+| `GetObject` | [T1530 — Data from Cloud Storage](https://attack.mitre.org/techniques/T1530/) | Collection | Represents access to data stored in a cloud object. A successful read alone does not establish malicious collection or exfiltration. |
 
-`T1530` is the primary mapping for the positive scenario because the detection culminates in cloud-object access. The other techniques describe the preceding discovery stages.
+**Primary mapping:** T1530 is associated with the final object-access stage of the positive scenario. T1619 and T1087.004 describe the preceding discovery stages.
 
-These mappings must be interpreted in the context of the simulated event semantics and verified against the official ATT&CK descriptions. A mapping is investigative context, not proof of malicious intent.
+**Detection limitation:** The correlation identifies a sequence of successful operations sharing a user and source IP within the configured time windows. It does not prove that the account is compromised or that the sequence is malicious. Validate the mappings against the actual cloud-provider API semantics and legitimate operational baselines before production use.
 
 ## 8. Detection Limitations
 
@@ -131,7 +131,7 @@ These mappings must be interpreted in the context of the simulated event semanti
 - Username and source IP correlation can be insufficient when identities, sessions, NAT, proxies, or shared infrastructure complicate attribution.
 - The event sequence alone does not prove that an identity or session is compromised.
 - The local Python reference detector is not a substitute for testing the SIEM implementations.
-- The Splunk query assumes the events are available under `sourcetype="cloud_activity"` with the expected field names.
+- The tested Splunk query filters for `host="siem-dual-detection-lab"` and `sourcetype="_json"`. These values reflect the current lab setup; adjust the index, host, sourcetype, and field names to match your own Splunk environment.
 - The Sentinel query currently uses an inline `datatable` as a synthetic test harness rather than querying a live workspace table.
 - Production deployment would require ingestion-field mapping, tuning, duplicate handling, alert investigation guidance, and broader testing.
 
