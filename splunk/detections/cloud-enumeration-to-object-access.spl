@@ -4,15 +4,12 @@ index=* host="siem-dual-detection-lab" sourcetype="_json"
 | eval _time=event_time
 | eval action=lower(action), user=lower(user), source_ip=lower(source_ip), result=lower(result), resource_type=lower(resource_type)
 | sort 0 _time
-| streamstats time_window=15m
-    last(eval(if(action="listobjects" AND result="success",event_time,null()))) AS listing_time
-    BY user source_ip
-| streamstats time_window=15m
-    last(eval(if(action="listroles" AND result="success",event_time,null()))) AS role_time
-    BY user source_ip
+| streamstats current=f last(eval(if(action="listobjects" AND result="success",event_time,null()))) AS prior_listing_time BY user source_ip
+| eval valid_role_listing=if(action="listroles" AND result="success" AND isnotnull(prior_listing_time) AND event_time>prior_listing_time AND event_time-prior_listing_time<=900,prior_listing_time,null())
+| eval valid_role_time=if(isnotnull(valid_role_listing),event_time,null())
+| streamstats last(valid_role_listing) AS listing_time last(valid_role_time) AS role_time BY user source_ip
 | where action="getobject" AND result="success" AND resource_type="object"
     AND isnotnull(listing_time) AND isnotnull(role_time)
     AND listing_time<role_time AND role_time<event_time
-    AND event_time-listing_time<=900
     AND event_time-role_time<=900
-| table timestamp user source_ip action resource
+| table timestamp user source_ip action resource listing_time role_time

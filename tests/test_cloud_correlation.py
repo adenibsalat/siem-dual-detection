@@ -168,6 +168,22 @@ def run_edge_case_tests():
     ), "The latest qualifying listing should be selected"
     print("[PASS] Latest qualifying listing selected")
 
+    # A later listing after role enumeration must not erase a valid sequence.
+    listing_after_role = [
+        make_event(0, "ListObjects", resource="valid-bucket"),
+        make_event(5, "ListRoles"),
+        make_event(7, "ListObjects", resource="later-bucket"),
+        make_event(10, "GetObject"),
+    ]
+    later_listing_alerts = detect_sequences(listing_after_role)
+    assert len(later_listing_alerts) == 1, (
+        "A later listing must not hide an earlier valid listing-role sequence"
+    )
+    assert later_listing_alerts[0]["listing_time"] == (
+        "2026-10-12T14:00:00Z"
+    ), "The listing before the valid role event should be selected"
+    print("[PASS] Later listing does not hide a valid sequence")
+
     # Multiple object reads should each produce one alert.
     multiple_reads = [
         make_event(0, "ListObjects"),
